@@ -5,9 +5,16 @@ from scipy import stats
 
 def analyze_results(results):
     """分析模拟结果"""
-    # 计算统计指标
+    if not results:
+        return {}
+
+    # 从结果中提取或计算所需指标（关键修改在这里）
     boy_ratios = [r['boy_ratio'] for r in results]
-    gender_ratios = [r['gender_ratio'] for r in results]
+    # 计算性别比例（男孩/女孩），避免除以0
+    gender_ratios = [
+        r['total_boys'] / r['total_girls'] if r['total_girls'] > 0 else float('inf')
+        for r in results
+    ]
     avg_family_sizes = [r['avg_family_size'] for r in results]
 
     stats_summary = {
@@ -16,9 +23,12 @@ def analyze_results(results):
         'mean_gender_ratio': np.mean(gender_ratios),
         'std_gender_ratio': np.std(gender_ratios),
         'mean_family_size': np.mean(avg_family_sizes),
-        'confidence_interval': stats.t.interval(0.95, len(boy_ratios) - 1,
-                                                loc=np.mean(boy_ratios),
-                                                scale=stats.sem(boy_ratios))
+        'confidence_interval': stats.t.interval(
+            0.95,
+            len(boy_ratios) - 1,
+            loc=np.mean(boy_ratios),
+            scale=stats.sem(boy_ratios)
+        )
     }
 
     return stats_summary
@@ -26,8 +36,16 @@ def analyze_results(results):
 
 def plot_results(results, stats_summary):
     """绘制结果图表"""
+    if not results:
+        print("没有结果可绘制")
+        return
+
     boy_ratios = [r['boy_ratio'] for r in results]
-    gender_ratios = [r['gender_ratio'] for r in results]
+    # 同样计算性别比例用于绘图
+    gender_ratios = [
+        r['total_boys'] / r['total_girls'] if r['total_girls'] > 0 else float('inf')
+        for r in results
+    ]
 
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
 
@@ -60,19 +78,14 @@ def plot_results(results, stats_summary):
     # 3. 家庭规模分布
     all_family_sizes = []
     for r in results:
-        all_family_sizes.extend(r['family_sizes'])
+        # 从每次模拟的结果中提取家庭规模（这里需要注意：原simulation.py没有保存每个家庭的规模，只保存了平均值）
+        # 为了绘图，我们用平均值近似展示
+        all_family_sizes.append(r['avg_family_size'])
 
-    size_counts = {}
-    for size in all_family_sizes:
-        size_counts[size] = size_counts.get(size, 0) + 1
-
-    sizes = sorted(size_counts.keys())
-    counts = [size_counts[s] for s in sizes]
-
-    ax3.bar(sizes[:10], counts[:10], color='lightcoral', alpha=0.7)
-    ax3.set_title('家庭规模分布（前10种）')
-    ax3.set_xlabel('家庭规模（孩子数量）')
-    ax3.set_ylabel('家庭数量')
+    ax3.hist(all_family_sizes, bins=10, alpha=0.7, color='lightcoral', edgecolor='black')
+    ax3.set_title('家庭规模分布')
+    ax3.set_xlabel('平均家庭规模（孩子数量）')
+    ax3.set_ylabel('模拟次数')
     ax3.grid(True, alpha=0.3, axis='y')
 
     # 4. 男女比例散点图
@@ -94,6 +107,10 @@ def plot_results(results, stats_summary):
 
 def print_summary(stats_summary):
     """打印统计摘要"""
+    if not stats_summary:
+        print("没有统计结果可显示")
+        return
+
     print("\n=== 实验结果统计摘要 ===")
     print(f"平均男孩比例: {stats_summary['mean_boy_ratio']:.6f} ± {stats_summary['std_boy_ratio']:.6f}")
     print(
